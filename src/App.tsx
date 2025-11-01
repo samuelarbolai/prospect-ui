@@ -50,6 +50,7 @@ export default function App() {
   const [newListName, setNewListName] = useState("");
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [listModalError, setListModalError] = useState<string | null>(null);
+  const [autoListSelection, setAutoListSelection] = useState(false);
   const tableSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const { options: listOptions } = useListOptions();
@@ -98,17 +99,20 @@ export default function App() {
       else next.add(id);
       return next;
     });
+    setAutoListSelection(false);
   };
 
   const toggleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(new Set(prospects.map((row) => row.id)));
+      setAutoListSelection(true);
     } else {
       setSelectedIds(new Set());
+      setAutoListSelection(false);
     }
   };
 
-  const applyFilters = (next: ProspectFilters) => {
+  const applyFilters = (next: ProspectFilters, autoSelect = false) => {
     const normalized: ProspectFilters = {
       listIds: sortStrings(next.listIds),
       priorities: sortStrings(next.priorities),
@@ -118,10 +122,11 @@ export default function App() {
     setDraftFilters(normalized);
     setAppliedFilters(normalized);
     setSelectedIds(new Set());
+    setAutoListSelection(autoSelect);
   };
 
   const handleApplyFilters = () => {
-    applyFilters(draftFilters);
+    applyFilters(draftFilters, false);
   };
 
   const openAddToListModal = async () => {
@@ -200,7 +205,7 @@ export default function App() {
           searchName: "",
         };
         setActiveListId(selectedListId);
-        applyFilters(nextFilters);
+        applyFilters(nextFilters, true);
         closeListModal();
       }
     } catch (err) {
@@ -210,15 +215,19 @@ export default function App() {
   };
 
   const handleQueueEnrichment = async () => {
-    if (selectedIds.size === 0) return;
+    if (targetIds.length === 0) {
+      alert("Select at least one prospect or pick a list containing prospects.");
+      return;
+    }
     try {
       const response = await fetch(`${API_BASE}/api/enqueue_enrichment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prospectIds: Array.from(selectedIds) }),
+        body: JSON.stringify({ prospectIds: targetIds }),
       });
       if (!response.ok) throw new Error(await response.text());
       setSelectedIds(new Set());
+      setAutoListSelection(listViewActive);
       refresh();
       alert("Enrichment queued successfully.");
     } catch (err) {
@@ -228,15 +237,19 @@ export default function App() {
   };
 
   const handleMarkReady = async () => {
-    if (selectedIds.size === 0) return;
+    if (targetIds.length === 0) {
+      alert("Select at least one prospect or pick a list containing prospects.");
+      return;
+    }
     try {
       const response = await fetch(`${API_BASE}/api/tag_outreach_ready`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prospectIds: Array.from(selectedIds) }),
+        body: JSON.stringify({ prospectIds: targetIds }),
       });
       if (!response.ok) throw new Error(await response.text());
       setSelectedIds(new Set());
+      setAutoListSelection(listViewActive);
       refresh();
       alert("Prospects tagged as outreach ready.");
     } catch (err) {
@@ -244,18 +257,6 @@ export default function App() {
       alert("Unable to tag outreach ready. Check console for details.");
     }
   };
-
-  const exportData = selectedRows.map((row) => ({
-    id: row.id,
-    name: row.name ?? "",
-    organization: row.organization ?? "",
-    role_title: row.role_title ?? "",
-    priority_bucket: row.priority_bucket ?? "",
-    priority_reason: row.priority_reason ?? "",
-    enrichment_status: row.enrichment?.status ?? "",
-    linkedin: row.social?.linkedin?.primary ?? "",
-    email: row.emails?.[0]?.address ?? "",
-  }));
 
   const handleInfiniteScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
@@ -265,8 +266,46 @@ export default function App() {
   };
 
   const totalCount = prospects.length;
-  const selectedCount = selectedIds.size;
+  const selectedCount = selectedIds.size > 0 ? selectedIds.size : listViewActive && autoListSelection ? prospects.length : 0;
   const queuedCount = prospects.filter((row) => row.enrichment?.status === "queued").length;
+
+  const targetIds = useMemo(() => {
+    if (selectedIds.size > 0) {
+      return Array.from(selectedIds);
+    }
+    if (listViewActive && autoListSelection) {
+      return prospects.map((row) => row.id);
+    }
+    return [] as string[];
+  }, [selectedIds, listViewActive, autoListSelection, prospects]);
+
+  const canRunBulkActions = selectedIds.size > 0 || (listViewActive && autoListSelection && prospects.length > 0);
+
+  const exportRows = useMemo(() => {
+    if (selectedIds.size > 0) {
+      return selectedRows;
+    }
+    if (listViewActive && autoListSelection) {
+      return prospects;
+    }
+    return [] as Prospect[];
+  }, [selectedRows, selectedIds, listViewActive, autoListSelection, prospects]);
+
+  const exportData = useMemo(
+    () =>
+      exportRows.map((row) => ({
+        id: row.id,
+        name: row.name ?? "",
+        organization: row.organization ?? "",
+        role_title: row.role_title ?? "",
+        priority_bucket: row.priority_bucket ?? "",
+        priority_reason: row.priority_reason ?? "",
+        enrichment_status: row.enrichment?.status ?? "",
+        linkedin: row.social?.linkedin?.primary ?? "",
+        email: row.emails?.[0]?.address ?? "",
+      })),
+    [exportRows],
+  );
 
   useEffect(() => {
     if (!listModalOpen) return;
@@ -288,6 +327,7 @@ export default function App() {
   useEffect(() => {
     if (listViewActive) {
       setSelectedIds(new Set(prospects.map((row) => row.id)));
+      setAutoListSelection(true);
     }
   }, [listViewActive, prospects]);
 
@@ -296,6 +336,12 @@ export default function App() {
       setActiveListId(null);
     }
   }, [activeListId, appliedFilters.listIds]);
+
+  useEffect(() => {
+    if (!listViewActive) {
+      setAutoListSelection(false);
+    }
+  }, [listViewActive]);
 
   useEffect(() => {
     const sentinel = tableSentinelRef.current;
@@ -496,19 +542,22 @@ export default function App() {
                   {listViewActive && activeList && (
                     <span className="current-list-pill">Viewing: {activeList.name}</span>
                   )}
+                  {listsError && !listsLoading && (
+                    <span className="list-error">{listsError}</span>
+                  )}
                 </div>
 
                 <div className="actions">
                   <button
                     className="primary"
-                    disabled={selectedIds.size === 0}
+                    disabled={!canRunBulkActions}
                     onClick={handleQueueEnrichment}
                   >
                     Run enrichment
                   </button>
                   <button
                     className="secondary"
-                    disabled={selectedIds.size === 0}
+                    disabled={!canRunBulkActions}
                     onClick={handleMarkReady}
                   >
                     Tag outreach ready
@@ -518,8 +567,8 @@ export default function App() {
                     data={exportData}
                     filename="prospects_export.csv"
                     onClick={() => {
-                      if (selectedIds.size === 0) {
-                        alert("Select at least one row to export.");
+                      if (exportRows.length === 0) {
+                        alert("Select at least one row or view a list with prospects before exporting.");
                         return false;
                       }
                       return true;

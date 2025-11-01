@@ -279,6 +279,12 @@ main {
   font-weight: 600;
 }
 
+.list-error {
+  font-size: 0.82rem;
+  color: #b0413e;
+  font-weight: 600;
+}
+
 .filter-input {
   display: flex;
   flex-direction: column;
