@@ -3,6 +3,7 @@ import { CSVLink } from "react-csv";
 import { Prospect, ProspectFilters } from "./types";
 import { useProspects } from "./hooks/useProspects";
 import { useListOptions } from "./hooks/useListOptions";
+import { useLists } from "./hooks/useLists";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -15,12 +16,24 @@ const INITIAL_FILTERS: ProspectFilters = {
 
 const PRIORITY_OPTIONS = ["P1", "P2"];
 const STATUS_OPTIONS = ["pending", "queued", "completed"];
+const CREATE_NEW_LIST_ID = "__new__";
 
 function isOutreachReady(row: Prospect): boolean {
   const priorityValid = row.priority_bucket === "P1" || row.priority_bucket === "P2";
   const enriched = row.enrichment?.status === "completed";
   const hasEmail = (row.emails ?? []).some((item) => item.address && item.address.length > 3);
   return priorityValid && enriched && hasEmail;
+}
+
+function sortStrings(values: string[]): string[] {
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
+function arraysHaveSameItems(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = sortStrings(a);
+  const sortedB = sortStrings(b);
+  return sortedA.every((value, index) => value === sortedB[index]);
 }
 
 export default function App() {
@@ -31,10 +44,24 @@ export default function App() {
   const [heroOpen, setHeroOpen] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [tableExpanded, setTableExpanded] = useState(false);
+  const [listModalOpen, setListModalOpen] = useState(false);
+  const [listModalMode, setListModalMode] = useState<"add" | "view">("add");
+  const [selectedListId, setSelectedListId] = useState<string>("");
+  const [newListName, setNewListName] = useState("");
+  const [activeListId, setActiveListId] = useState<string | null>(null);
+  const [listModalError, setListModalError] = useState<string | null>(null);
   const tableSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const { options: listOptions } = useListOptions();
   const { prospects, loading, error, hasMore, loadMore, refresh } = useProspects(appliedFilters);
+  const {
+    lists,
+    loading: listsLoading,
+    error: listsError,
+    refresh: refreshLists,
+    createList,
+    addProspectsToList,
+  } = useLists();
 
   const readyCount = useMemo(
     () => prospects.filter((row) => isOutreachReady(row)).length,
@@ -46,16 +73,22 @@ export default function App() {
     [prospects, selectedIds],
   );
 
-  const arraysEqual = (a: string[], b: string[]) =>
-    a.length === b.length && a.every((value, index) => value === b[index]);
-
   const filtersDirty = useMemo(
     () =>
-      !arraysEqual(draftFilters.listIds, appliedFilters.listIds) ||
-      !arraysEqual(draftFilters.priorities, appliedFilters.priorities) ||
-      !arraysEqual(draftFilters.statuses, appliedFilters.statuses) ||
+      !arraysHaveSameItems(draftFilters.listIds, appliedFilters.listIds) ||
+      !arraysHaveSameItems(draftFilters.priorities, appliedFilters.priorities) ||
+      !arraysHaveSameItems(draftFilters.statuses, appliedFilters.statuses) ||
       draftFilters.searchName !== appliedFilters.searchName,
     [draftFilters, appliedFilters],
+  );
+
+  const activeList = useMemo(
+    () => (activeListId ? lists.find((item) => item.id === activeListId) ?? null : null),
+    [lists, activeListId],
+  );
+  const listViewActive = useMemo(
+    () => activeListId !== null && appliedFilters.listIds.length === 1 && appliedFilters.listIds[0] === activeListId,
+    [activeListId, appliedFilters.listIds],
   );
 
   const toggleSelection = (id: string) => {
@@ -75,14 +108,105 @@ export default function App() {
     }
   };
 
-  const handleApplyFilters = () => {
-    setAppliedFilters({
-      listIds: [...draftFilters.listIds],
-      priorities: [...draftFilters.priorities],
-      statuses: [...draftFilters.statuses],
-      searchName: draftFilters.searchName,
-    });
+  const applyFilters = (next: ProspectFilters) => {
+    const normalized: ProspectFilters = {
+      listIds: sortStrings(next.listIds),
+      priorities: sortStrings(next.priorities),
+      statuses: sortStrings(next.statuses),
+      searchName: next.searchName,
+    };
+    setDraftFilters(normalized);
+    setAppliedFilters(normalized);
     setSelectedIds(new Set());
+  };
+
+  const handleApplyFilters = () => {
+    applyFilters(draftFilters);
+  };
+
+  const openAddToListModal = async () => {
+    if (selectedIds.size === 0) {
+      alert("Select at least one prospect to add to a list.");
+      return;
+    }
+    setListModalMode("add");
+    setListModalError(null);
+    setNewListName("");
+    await refreshLists();
+    setListModalOpen(true);
+  };
+
+  const openViewListModal = async () => {
+    if (lists.length === 0) {
+      await refreshLists();
+    }
+    if (lists.length === 0 && !listsLoading) {
+      alert("No lists available yet. Add prospects to a list first.");
+      return;
+    }
+    setListModalMode("view");
+    setListModalError(null);
+    setNewListName("");
+    await refreshLists();
+    setListModalOpen(true);
+  };
+
+  const closeListModal = () => {
+    setListModalOpen(false);
+    setListModalError(null);
+    setNewListName("");
+  };
+
+  const handleListModalConfirm = async () => {
+    try {
+      setListModalError(null);
+      if (listModalMode === "add") {
+        const ids = Array.from(selectedIds);
+        if (ids.length === 0) {
+          setListModalError("Select prospects before adding to a list.");
+          return;
+        }
+
+        let targetListId = selectedListId;
+        if (!targetListId || targetListId === CREATE_NEW_LIST_ID) {
+          const trimmedName = newListName.trim();
+          if (!trimmedName) {
+            setListModalError("Enter a name for the new list.");
+            return;
+          }
+          const created = await createList(trimmedName);
+          targetListId = created.id;
+          setSelectedListId(created.id);
+        }
+
+        const { added, alreadyPresent } = await addProspectsToList(targetListId, ids);
+        await refreshLists();
+        setActiveListId(targetListId);
+        closeListModal();
+        alert(
+          `List updated. Added ${added} prospect${added === 1 ? "" : "s"}${
+            alreadyPresent > 0 ? ` (${alreadyPresent} already present)` : ""
+          }.`,
+        );
+      } else {
+        if (!selectedListId) {
+          setListModalError("Choose a list to view.");
+          return;
+        }
+        const nextFilters: ProspectFilters = {
+          listIds: [selectedListId],
+          priorities: [],
+          statuses: [],
+          searchName: "",
+        };
+        setActiveListId(selectedListId);
+        applyFilters(nextFilters);
+        closeListModal();
+      }
+    } catch (err) {
+      console.error(err);
+      setListModalError(err instanceof Error ? err.message : "Unable to update list. Try again.");
+    }
   };
 
   const handleQueueEnrichment = async () => {
@@ -143,6 +267,35 @@ export default function App() {
   const totalCount = prospects.length;
   const selectedCount = selectedIds.size;
   const queuedCount = prospects.filter((row) => row.enrichment?.status === "queued").length;
+
+  useEffect(() => {
+    if (!listModalOpen) return;
+    if (listModalMode === "add") {
+      if (lists.length === 0) {
+        setSelectedListId(CREATE_NEW_LIST_ID);
+      } else if (!selectedListId || (selectedListId !== CREATE_NEW_LIST_ID && !lists.some((list) => list.id === selectedListId))) {
+        setSelectedListId(lists[0].id);
+      }
+    } else if (listModalMode === "view") {
+      if (lists.length === 0) {
+        setSelectedListId("");
+      } else if (!selectedListId || !lists.some((list) => list.id === selectedListId)) {
+        setSelectedListId(activeListId ?? lists[0].id);
+      }
+    }
+  }, [listModalOpen, listModalMode, lists, selectedListId, activeListId]);
+
+  useEffect(() => {
+    if (listViewActive) {
+      setSelectedIds(new Set(prospects.map((row) => row.id)));
+    }
+  }, [listViewActive, prospects]);
+
+  useEffect(() => {
+    if (activeListId && !appliedFilters.listIds.includes(activeListId)) {
+      setActiveListId(null);
+    }
+  }, [activeListId, appliedFilters.listIds]);
 
   useEffect(() => {
     const sentinel = tableSentinelRef.current;
@@ -323,13 +476,35 @@ export default function App() {
                   )}
                 </div>
 
+                <div className="list-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={openAddToListModal}
+                    disabled={selectedIds.size === 0}
+                  >
+                    Add to list
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={openViewListModal}
+                    disabled={(lists.length === 0 && !listsLoading) || listsLoading}
+                  >
+                    View list
+                  </button>
+                  {listViewActive && activeList && (
+                    <span className="current-list-pill">Viewing: {activeList.name}</span>
+                  )}
+                </div>
+
                 <div className="actions">
                   <button
                     className="primary"
                     disabled={selectedIds.size === 0}
                     onClick={handleQueueEnrichment}
                   >
-                    Queue enrichment
+                    Run enrichment
                   </button>
                   <button
                     className="secondary"
@@ -466,6 +641,86 @@ export default function App() {
           )}
         </aside>
       </main>
+
+      {listModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <h3>{listModalMode === "add" ? "Add prospects to a list" : "View a list"}</h3>
+            {listModalMode === "add" ? (
+              <>
+                {listsLoading ? (
+                  <p>Loading lists…</p>
+                ) : (
+                  <label className="modal-field">
+                    <span>Select a list</span>
+                    <select
+                      value={selectedListId}
+                      onChange={(event) => {
+                        const value = event.target.value || CREATE_NEW_LIST_ID;
+                        setSelectedListId(value);
+                      }}
+                    >
+                      {lists.map((list) => (
+                        <option key={list.id} value={list.id}>
+                          {list.name} {list.prospectCount ? `(${list.prospectCount})` : ""}
+                        </option>
+                      ))}
+                      <option value={CREATE_NEW_LIST_ID}>Create new list…</option>
+                    </select>
+                  </label>
+                )}
+                {(selectedListId === CREATE_NEW_LIST_ID || lists.length === 0) && (
+                  <label className="modal-field">
+                    <span>New list name</span>
+                    <input
+                      type="text"
+                      value={newListName}
+                      onChange={(event) => setNewListName(event.target.value)}
+                      placeholder="e.g. ICP - High intent"
+                    />
+                  </label>
+                )}
+                <p className="modal-hint">
+                  {selectedIds.size} prospect{selectedIds.size === 1 ? "" : "s"} selected.
+                </p>
+              </>
+            ) : (
+              <>
+                {listsLoading ? (
+                  <p>Loading lists…</p>
+                ) : (
+                  <label className="modal-field">
+                    <span>Select a list to view</span>
+                    <select value={selectedListId} onChange={(event) => setSelectedListId(event.target.value)}>
+                      <option value="">Select a list</option>
+                      {lists.map((list) => (
+                        <option key={list.id} value={list.id}>
+                          {list.name} {list.prospectCount ? `(${list.prospectCount})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            )}
+            {listModalError && <p className="modal-error">{listModalError}</p>}
+            {listsError && !listsLoading && <p className="modal-error subtle">{listsError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={closeListModal}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={handleListModalConfirm}
+                disabled={listModalMode === "view" && (!selectedListId || selectedListId === CREATE_NEW_LIST_ID)}
+              >
+                {listModalMode === "add" ? "Save list" : "Open list"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
