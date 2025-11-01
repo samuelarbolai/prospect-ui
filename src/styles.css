@@ -102,9 +102,9 @@ main {
 
 .hero {
   display: grid;
-  gap: 1.75rem;
-  padding: 2rem 2.3rem;
-  border-radius: 30px;
+  gap: 1.25rem;
+  padding: 1.6rem 1.75rem;
+  border-radius: 26px;
   border: 1px solid var(--surface-border);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 24px 55px rgba(206, 164, 138, 0.25);
@@ -113,39 +113,61 @@ main {
 }
 
 .hero.collapsed {
-  padding: 1rem 1.5rem;
+  padding: 1.2rem 1.5rem;
 }
 
-.hero-top {
+.hero-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1.85rem;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 32rem;
+}
+
+.hero-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
 }
 
 .collapse-btn {
-  align-self: flex-end;
-  border: none;
-  background: none;
-  color: rgba(94, 68, 57, 0.8);
-  font-size: 0.85rem;
-  font-weight: 600;
+  min-width: 128px;
+  border-radius: 999px;
+  border: 1px solid rgba(233, 203, 182, 0.85);
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(94, 68, 57, 0.85);
+  font-size: 0.82rem;
+  font-weight: 500;
   cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  padding: 0.55rem 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 24px rgba(210, 180, 156, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.collapse-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(210, 180, 156, 0.28);
 }
 
 .hero h2 {
-  margin: 0 0 0.65rem 0;
-  font-size: 1.85rem;
-  letter-spacing: -0.01em;
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.005em;
   font-weight: 600;
 }
 
 .hero p {
   margin: 0;
   color: var(--text-muted);
-  max-width: 32rem;
   line-height: 1.55;
 }
 
@@ -156,9 +178,9 @@ main {
 }
 
 .summary-card {
-  min-width: 170px;
-  padding: 1.1rem 1.3rem;
-  border-radius: 20px;
+  min-width: 160px;
+  padding: 1rem 1.15rem;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(234, 210, 191, 0.72);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 12px 28px rgba(210, 174, 152, 0.28);
@@ -166,15 +188,20 @@ main {
 
 .summary-card span {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: rgba(93, 68, 57, 0.68);
   margin-bottom: 0.45rem;
 }
 
 .summary-card strong {
-  font-size: 1.55rem;
+  font-size: 1.32rem;
   font-weight: 700;
   color: #1f2a44;
+}
+
+.table-sentinel {
+  height: 1px;
+  margin-bottom: 0.75rem;
 }
 
 .panel-stack {
@@ -199,7 +226,7 @@ main {
 
 .panel-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
@@ -216,6 +243,23 @@ main {
   display: flex;
   gap: 1.1rem;
   flex-wrap: wrap;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.refresh-button {
+  min-width: 164px;
+}
+
+.filter-hint {
+  font-size: 0.82rem;
+  color: #a45a34;
+  font-weight: 500;
 }
 
 .filter-input {
@@ -306,11 +350,18 @@ button:disabled,
   display: flex;
   flex-direction: column;
   min-height: 420px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  max-height: clamp(420px, 60vh, 760px);
+  transition: max-height 0.24s ease, height 0.24s ease;
 }
 
 .table-container {
   flex: 1;
   overflow: auto;
+  position: relative;
+  max-height: inherit;
 }
 
 table {
@@ -322,6 +373,25 @@ table {
 thead {
   background: rgba(243, 188, 136, 0.3);
   color: #4c332f;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(243, 188, 136, 0.92);
+  backdrop-filter: blur(6px);
+  z-index: 2;
+}
+
+.table-card.expanded {
+  top: 0;
+  height: calc(100vh - 1.5rem);
+  max-height: none;
+}
+
+.table-card.expanded .table-container {
+  height: 100%;
+  max-height: none;
 }
 
 th,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CSVLink } from "react-csv";
 import { Prospect, ProspectFilters } from "./types";
 import { useProspects } from "./hooks/useProspects";
@@ -24,14 +24,17 @@ function isOutreachReady(row: Prospect): boolean {
 }
 
 export default function App() {
-  const [filters, setFilters] = useState<ProspectFilters>(INITIAL_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<ProspectFilters>(INITIAL_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<ProspectFilters>(INITIAL_FILTERS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null);
   const [heroOpen, setHeroOpen] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [tableExpanded, setTableExpanded] = useState(false);
+  const tableSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const { options: listOptions } = useListOptions();
-  const { prospects, loading, error, hasMore, loadMore, refresh } = useProspects(filters);
+  const { prospects, loading, error, hasMore, loadMore, refresh } = useProspects(appliedFilters);
 
   const readyCount = useMemo(
     () => prospects.filter((row) => isOutreachReady(row)).length,
@@ -41,6 +44,18 @@ export default function App() {
   const selectedRows = useMemo(
     () => prospects.filter((row) => selectedIds.has(row.id)),
     [prospects, selectedIds],
+  );
+
+  const arraysEqual = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((value, index) => value === b[index]);
+
+  const filtersDirty = useMemo(
+    () =>
+      !arraysEqual(draftFilters.listIds, appliedFilters.listIds) ||
+      !arraysEqual(draftFilters.priorities, appliedFilters.priorities) ||
+      !arraysEqual(draftFilters.statuses, appliedFilters.statuses) ||
+      draftFilters.searchName !== appliedFilters.searchName,
+    [draftFilters, appliedFilters],
   );
 
   const toggleSelection = (id: string) => {
@@ -58,6 +73,16 @@ export default function App() {
     } else {
       setSelectedIds(new Set());
     }
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      listIds: [...draftFilters.listIds],
+      priorities: [...draftFilters.priorities],
+      statuses: [...draftFilters.statuses],
+      searchName: draftFilters.searchName,
+    });
+    setSelectedIds(new Set());
   };
 
   const handleQueueEnrichment = async () => {
@@ -119,6 +144,27 @@ export default function App() {
   const selectedCount = selectedIds.size;
   const queuedCount = prospects.filter((row) => row.enrichment?.status === "queued").length;
 
+  useEffect(() => {
+    const sentinel = tableSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setTableExpanded((prev) => {
+          const shouldExpand = !entry.isIntersecting;
+          return prev === shouldExpand ? prev : shouldExpand;
+        });
+      },
+      {
+        threshold: 0,
+        rootMargin: "-12px 0px 0px 0px",
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -128,31 +174,32 @@ export default function App() {
         </div>
         <div className="top-actions">
           <span className="workspace-tag">LeadGen Workspace</span>
-          <button className="secondary" onClick={() => refresh()}>
-            Refresh
-          </button>
         </div>
       </header>
 
       <main>
         <section className={`hero ${heroOpen ? "" : "collapsed"}`}>
-          <button
-            className="collapse-btn"
-            type="button"
-            onClick={() => setHeroOpen((prev) => !prev)}
-            aria-expanded={heroOpen}
-          >
-            {heroOpen ? "Hide overview" : "Show overview"}
-          </button>
-          {heroOpen && (
-            <div className="hero-top">
-              <div>
-                <h2>Pipeline Control Center</h2>
+          <div className="hero-header">
+            <div className="hero-title">
+              <h2>Pipeline Control Center</h2>
+              {heroOpen && (
                 <p>
                   Prioritize prospects across outreach stages, trigger enrichment, and keep Firestore aligned—all in one
                   calm workspace.
                 </p>
-              </div>
+              )}
+            </div>
+            <button
+              className="collapse-btn"
+              type="button"
+              onClick={() => setHeroOpen((prev) => !prev)}
+              aria-expanded={heroOpen}
+            >
+              {heroOpen ? "Hide overview" : "Show overview"}
+            </button>
+          </div>
+          {heroOpen && (
+            <div className="hero-body">
               <div className="summary-cards">
                 <div className="summary-card">
                   <span>Visible prospects</span>
@@ -185,7 +232,7 @@ export default function App() {
                 onClick={() => setFiltersOpen((prev) => !prev)}
                 aria-expanded={filtersOpen}
               >
-                {filtersOpen ? "Hide" : "Show"}
+                {filtersOpen ? "Hide filters" : "Show filters"}
               </button>
             </div>
             {filtersOpen && (
@@ -196,10 +243,10 @@ export default function App() {
                     <select
                       id="list-filter"
                       multiple
-                      value={filters.listIds}
+                      value={draftFilters.listIds}
                       onChange={(event) => {
                         const values = Array.from(event.target.selectedOptions, (opt) => opt.value);
-                        setFilters((prev) => ({ ...prev, listIds: values }));
+                        setDraftFilters((prev) => ({ ...prev, listIds: values }));
                       }}
                     >
                       {listOptions.map((option) => (
@@ -215,10 +262,10 @@ export default function App() {
                     <select
                       id="priority-filter"
                       multiple
-                      value={filters.priorities}
+                      value={draftFilters.priorities}
                       onChange={(event) => {
                         const values = Array.from(event.target.selectedOptions, (opt) => opt.value);
-                        setFilters((prev) => ({ ...prev, priorities: values }));
+                        setDraftFilters((prev) => ({ ...prev, priorities: values }));
                       }}
                     >
                       {PRIORITY_OPTIONS.map((option) => (
@@ -234,10 +281,10 @@ export default function App() {
                     <select
                       id="status-filter"
                       multiple
-                      value={filters.statuses}
+                      value={draftFilters.statuses}
                       onChange={(event) => {
                         const values = Array.from(event.target.selectedOptions, (opt) => opt.value);
-                        setFilters((prev) => ({ ...prev, statuses: values }));
+                        setDraftFilters((prev) => ({ ...prev, statuses: values }));
                       }}
                     >
                       {STATUS_OPTIONS.map((option) => (
@@ -246,20 +293,34 @@ export default function App() {
                         </option>
                       ))}
                     </select>
-                  </div>
+                </div>
 
-                  <div className="filter-input">
-                    <label htmlFor="search-filter">Search</label>
-                    <input
+                <div className="filter-input">
+                  <label htmlFor="search-filter">Search</label>
+                  <input
                       id="search-filter"
                       type="search"
                       placeholder="Name, organization, or title"
-                      value={filters.searchName}
+                      value={draftFilters.searchName}
                       onChange={(event) =>
-                        setFilters((prev) => ({ ...prev, searchName: event.target.value }))
+                        setDraftFilters((prev) => ({ ...prev, searchName: event.target.value }))
                       }
                     />
                   </div>
+                </div>
+
+                <div className="filter-actions">
+                  <button
+                    type="button"
+                    className="secondary refresh-button"
+                    onClick={handleApplyFilters}
+                    disabled={loading}
+                  >
+                    Refresh results
+                  </button>
+                  {filtersDirty && (
+                    <span className="filter-hint">Filters updated—click refresh to apply.</span>
+                  )}
                 </div>
 
                 <div className="actions">
@@ -299,12 +360,9 @@ export default function App() {
 
         {error && <p style={{ color: "crimson" }}>{error}</p>}
 
-        <section className="table-card">
-          <div
-            className="table-container"
-            style={{ maxHeight: "60vh" }}
-            onScroll={handleInfiniteScroll}
-          >
+        <div ref={tableSentinelRef} className="table-sentinel" aria-hidden="true" />
+        <section className={`table-card ${tableExpanded ? "expanded" : ""}`}>
+          <div className="table-container" onScroll={handleInfiniteScroll}>
             <table>
               <thead>
                 <tr>
