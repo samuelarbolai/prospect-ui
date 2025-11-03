@@ -215,15 +215,19 @@ export default function App() {
   };
 
   const handleQueueEnrichment = async () => {
+    if (!activeListId) {
+      alert("Switch to a saved list before running enrichment.");
+      return;
+    }
     if (targetIds.length === 0) {
-      alert("Select at least one prospect or pick a list containing prospects.");
+      alert("Select at least one prospect inside the active list.");
       return;
     }
     try {
       const response = await fetch(`${API_BASE}/api/enqueue_enrichment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prospectIds: targetIds }),
+        body: JSON.stringify({ prospectIds: targetIds, listId: activeListId }),
       });
       if (!response.ok) throw new Error(await response.text());
       setSelectedIds(new Set());
@@ -270,16 +274,23 @@ export default function App() {
   const queuedCount = prospects.filter((row) => row.enrichment?.status === "queued").length;
 
   const targetIds = useMemo(() => {
-    if (selectedIds.size > 0) {
-      return Array.from(selectedIds);
+    if (!listViewActive || !activeListId) {
+      return [] as string[];
     }
-    if (listViewActive && autoListSelection) {
+    if (selectedIds.size > 0) {
+      return selectedRows
+        .filter((row) => row.list_ids?.includes(activeListId))
+        .map((row) => row.id);
+    }
+    if (autoListSelection) {
       return prospects.map((row) => row.id);
     }
     return [] as string[];
-  }, [selectedIds, listViewActive, autoListSelection, prospects]);
+  }, [selectedIds, selectedRows, listViewActive, autoListSelection, prospects, activeListId]);
 
-  const canRunBulkActions = selectedIds.size > 0 || (listViewActive && autoListSelection && prospects.length > 0);
+  const canRunBulkActions =
+    (listViewActive && autoListSelection && prospects.length > 0) ||
+    (listViewActive && selectedIds.size > 0 && !!activeListId && selectedRows.every((row) => row.list_ids?.includes(activeListId)));
 
   const exportRows = useMemo(() => {
     if (selectedIds.size > 0) {
