@@ -16,6 +16,10 @@ export interface Prospect {
     last_run_at?: string | null;
     version?: string | null;
     notes?: string | null;
+    vertical?: string | null;
+    keywords?: string | null;
+    domain_status?: string | null;
+    domain_run_id?: string | null;
   };
   emails?: { address?: string; label?: string; status?: string }[];
   social?: {

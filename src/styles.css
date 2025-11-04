@@ -341,6 +341,18 @@ button.primary:hover:not(:disabled) {
   box-shadow: 0 22px 48px rgba(233, 183, 152, 0.45);
 }
 
+button.primary.ghost {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(244, 167, 196, 0.55);
+  color: #6b3c44;
+  box-shadow: 0 14px 28px rgba(233, 183, 152, 0.28);
+}
+
+button.primary.ghost:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 36px rgba(233, 183, 152, 0.35);
+}
+
 button.secondary,
 .secondary {
   background: rgba(255, 255, 255, 0.95);
@@ -391,6 +403,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.94rem;
+  table-layout: fixed;
 }
 
 thead {
@@ -422,6 +435,9 @@ td {
   padding: 0.9rem 1.05rem;
   text-align: left;
   border-bottom: 1px solid rgba(233, 203, 182, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 tbody tr:hover {
@@ -459,6 +475,55 @@ tbody tr:hover {
 .badge.completed {
   background: var(--badge-completed);
   color: #3f6130;
+}
+
+.badge.partial {
+  background: rgba(244, 167, 196, 0.28);
+  color: #7a3751;
+}
+
+.badge.failed {
+  background: rgba(208, 96, 92, 0.22);
+  color: #7d2d2a;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  padding-right: 0.75rem;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
+.column-resizer {
+  position: absolute;
+  right: -6px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+}
+
+.column-resizer::after {
+  content: "";
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 5px;
+  width: 2px;
+  background: rgba(150, 120, 110, 0.4);
+}
+
+.cell-link {
+  color: #5d3c5d;
+  text-decoration: none;
+}
+
+.cell-link:hover {
+  text-decoration: underline;
 }
 
 .drawer {

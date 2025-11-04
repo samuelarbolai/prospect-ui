@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { CSVLink } from "react-csv";
 import { Prospect, ProspectFilters } from "./types";
 import { useProspects } from "./hooks/useProspects";
@@ -52,6 +53,152 @@ export default function App() {
   const [listModalError, setListModalError] = useState<string | null>(null);
   const [autoListSelection, setAutoListSelection] = useState(false);
   const tableSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  type ColumnDef = {
+    id: string;
+    label: string;
+    width: number;
+    render: (row: Prospect) => ReactNode;
+  };
+
+  const renderStatusBadge = useCallback((rawStatus: string | null | undefined) => {
+    const normalized = (rawStatus ?? "pending").toLowerCase();
+    const label = normalized.replace(/_/g, " ");
+    return <span className={`badge ${normalized}`}>{label}</span>;
+  }, []);
+
+  const renderDomainCell = useCallback(
+    (row: Prospect) => {
+      const domain = row.org_domain?.trim();
+      if (domain) {
+        const href = domain.startsWith("http") ? domain : `https://${domain}`;
+        return (
+          <a
+            className="cell-link"
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {domain}
+          </a>
+        );
+      }
+      return renderStatusBadge(row.enrichment?.domain_status ?? "pending");
+    },
+    [renderStatusBadge],
+  );
+
+  const renderLinkedInCell = useCallback(
+    (row: Prospect) => {
+      const url = row.social?.linkedin?.primary?.trim();
+      if (url) {
+        const display = url.replace(/^https?:\/\//, "");
+        return (
+          <a
+            className="cell-link"
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {display}
+          </a>
+        );
+      }
+      return renderStatusBadge(row.social?.linkedin?.status ?? row.enrichment?.status ?? "pending");
+    },
+    [renderStatusBadge],
+  );
+
+  const renderEmailCell = useCallback((row: Prospect) => {
+    const email = row.emails?.[0]?.address;
+    if (!email) return "—";
+    return (
+      <a
+        className="cell-link"
+        href={`mailto:${email}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {email}
+      </a>
+    );
+  }, []);
+
+  const columns: ColumnDef[] = useMemo(
+    () => [
+      { id: "name", label: "Name", width: 220, render: (row) => row.name ?? "—" },
+      { id: "organization", label: "Organization", width: 220, render: (row) => row.organization ?? "—" },
+      { id: "title", label: "Title", width: 220, render: (row) => row.role_title ?? "—" },
+      { id: "priority", label: "Priority", width: 120, render: (row) => row.priority_bucket ?? "—" },
+      {
+        id: "status",
+        label: "Status",
+        width: 130,
+        render: (row) => renderStatusBadge(row.enrichment?.status ?? "pending"),
+      },
+      {
+        id: "vertical",
+        label: "Vertical",
+        width: 160,
+        render: (row) => row.enrichment?.vertical ?? "—",
+      },
+      {
+        id: "domain",
+        label: "Corporate Domain",
+        width: 200,
+        render: renderDomainCell,
+      },
+      {
+        id: "linkedin",
+        label: "LinkedIn",
+        width: 210,
+        render: renderLinkedInCell,
+      },
+      {
+        id: "email",
+        label: "Work Email",
+        width: 220,
+        render: renderEmailCell,
+      },
+    ],
+    [renderDomainCell, renderEmailCell, renderLinkedInCell, renderStatusBadge],
+  );
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
+    columns.reduce((acc, column) => {
+      acc[column.id] = column.width;
+      return acc;
+    }, {} as Record<string, number>),
+  );
+
+  const [resizing, setResizing] = useState<{ id: string; startX: number; startWidth: number } | null>(null);
+
+  const startResize = useCallback(
+    (id: string, clientX: number) => {
+      const baseWidth = columnWidths[id] ?? columns.find((col) => col.id === id)?.width ?? 160;
+      setResizing({ id, startX: clientX, startWidth: baseWidth });
+    },
+    [columnWidths, columns],
+  );
+
+  useEffect(() => {
+    if (!resizing) return;
+    const handleMove = (event: MouseEvent) => {
+      const delta = event.clientX - resizing.startX;
+      setColumnWidths((prev) => ({
+        ...prev,
+        [resizing.id]: Math.max(120, resizing.startWidth + delta),
+      }));
+    };
+    const handleUp = () => setResizing(null);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [resizing]);
 
   const { options: listOptions } = useListOptions();
   const { prospects, loading, error, hasMore, loadMore, refresh } = useProspects(appliedFilters);
@@ -214,7 +361,7 @@ export default function App() {
     }
   };
 
-  const handleQueueEnrichment = async () => {
+  const enqueueEnrichment = async (jobType: "linkedin" | "domain") => {
     if (!activeListId) {
       alert("Switch to a saved list before running enrichment.");
       return;
@@ -227,18 +374,21 @@ export default function App() {
       const response = await fetch(`${API_BASE}/api/enqueue_enrichment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prospectIds: targetIds, listId: activeListId }),
+        body: JSON.stringify({ prospectIds: targetIds, listId: activeListId, jobType }),
       });
       if (!response.ok) throw new Error(await response.text());
       setSelectedIds(new Set());
       setAutoListSelection(listViewActive);
       refresh();
-      alert("Enrichment queued successfully.");
+      alert(jobType === "domain" ? "Corporate enrichment started." : "LinkedIn enrichment queued.");
     } catch (err) {
       console.error(err);
       alert("Unable to queue enrichment. Check console for details.");
     }
   };
+
+  const handleRunLinkedIn = () => enqueueEnrichment("linkedin");
+  const handleRunDomain = () => enqueueEnrichment("domain");
 
   const handleMarkReady = async () => {
     if (targetIds.length === 0) {
@@ -312,6 +462,9 @@ export default function App() {
         priority_bucket: row.priority_bucket ?? "",
         priority_reason: row.priority_reason ?? "",
         enrichment_status: row.enrichment?.status ?? "",
+        enrichment_vertical: row.enrichment?.vertical ?? "",
+        enrichment_domain_status: row.enrichment?.domain_status ?? "",
+        corporate_domain: row.org_domain ?? "",
         linkedin: row.social?.linkedin?.primary ?? "",
         email: row.emails?.[0]?.address ?? "",
       })),
@@ -562,9 +715,16 @@ export default function App() {
                   <button
                     className="primary"
                     disabled={!canRunBulkActions}
-                    onClick={handleQueueEnrichment}
+                    onClick={handleRunLinkedIn}
                   >
-                    Run enrichment
+                    Run LinkedIn
+                  </button>
+                  <button
+                    className="primary ghost"
+                    disabled={!canRunBulkActions}
+                    onClick={handleRunDomain}
+                  >
+                    Enrich domain & vertical
                   </button>
                   <button
                     className="secondary"
@@ -609,63 +769,58 @@ export default function App() {
                       aria-label="Select all"
                     />
                   </th>
-                  <th>Name</th>
-                  <th>Organization</th>
-                  <th>Title</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>LinkedIn</th>
-                  <th>Email</th>
+                  {columns.map((column) => {
+                    const width = columnWidths[column.id] ?? column.width;
+                    return (
+                      <th key={column.id} style={{ width, minWidth: width }}>
+                        <div className="column-header">
+                          <span>{column.label}</span>
+                          <span
+                            className="column-resizer"
+                            role="separator"
+                            aria-orientation="vertical"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              startResize(column.id, event.clientX);
+                            }}
+                          />
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {prospects.map((row) => {
-                  const status = row.enrichment?.status ?? "pending";
-                  return (
-                    <tr key={row.id} onClick={() => setDrawerProspect(row)}>
-                      <td onClick={(event) => event.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(row.id)}
-                          onChange={() => toggleSelection(row.id)}
-                          aria-label={`Select ${row.name ?? row.id}`}
-                        />
-                      </td>
-                      <td>{row.name ?? "—"}</td>
-                      <td>{row.organization ?? "—"}</td>
-                      <td>{row.role_title ?? "—"}</td>
-                      <td>{row.priority_bucket ?? "—"}</td>
-                      <td>
-                        <span className={`badge ${status}`}>{status}</span>
-                      </td>
-                      <td>
-                        {row.social?.linkedin?.primary ? (
-                          <a
-                            href={row.social.linkedin.primary}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            Profile
-                          </a>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td>{row.emails?.[0]?.address ?? "—"}</td>
-                    </tr>
-                  );
-                })}
+                {prospects.map((row) => (
+                  <tr key={row.id} onClick={() => setDrawerProspect(row)}>
+                    <td onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(row.id)}
+                        onChange={() => toggleSelection(row.id)}
+                        aria-label={`Select ${row.name ?? row.id}`}
+                      />
+                    </td>
+                    {columns.map((column) => {
+                      const width = columnWidths[column.id] ?? column.width;
+                      return (
+                        <td key={column.id} style={{ width, minWidth: width }}>
+                          {column.render(row)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
                 {loading && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: "1rem" }}>
+                    <td colSpan={columns.length + 1} style={{ textAlign: "center", padding: "1rem" }}>
                       Loading…
                     </td>
                   </tr>
                 )}
                 {!hasMore && !loading && prospects.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: "1rem" }}>
+                    <td colSpan={columns.length + 1} style={{ textAlign: "center", padding: "1rem" }}>
                       No prospects found.
                     </td>
                   </tr>
