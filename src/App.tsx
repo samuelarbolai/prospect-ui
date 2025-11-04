@@ -5,6 +5,10 @@ import { Prospect, ProspectFilters } from "./types";
 import { useProspects } from "./hooks/useProspects";
 import { useListOptions } from "./hooks/useListOptions";
 import { useLists } from "./hooks/useLists";
+import { inject } from '@vercel/analytics';
+ 
+inject();
+
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
