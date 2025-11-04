@@ -406,6 +406,14 @@ table {
   table-layout: fixed;
 }
 
+.table-container th:first-child,
+.table-container td:first-child {
+  width: 48px;
+  min-width: 48px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
 thead {
   background: rgba(243, 188, 136, 0.3);
   color: #4c332f;
