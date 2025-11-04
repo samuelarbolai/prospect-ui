@@ -498,6 +498,7 @@ tbody tr:hover {
 .column-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   position: relative;
   padding-right: 0.75rem;
