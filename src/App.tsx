@@ -383,39 +383,26 @@ export default function App() {
       return;
     }
 
-    // For domain enrichment, show cost estimator
-    if (jobType === "domain") {
-      setPendingEnrichmentType(jobType);
-      setCostEstimatorOpen(true);
-      return;
-    }
-
-    // For LinkedIn enrichment, proceed directly (no pricing)
-    await executeEnrichment(jobType);
+    // Show cost estimator for both LinkedIn and domain enrichment
+    setPendingEnrichmentType(jobType);
+    setCostEstimatorOpen(true);
   };
 
   const executeEnrichment = async (jobType: "linkedin" | "domain") => {
     setIsEnriching(true);
     try {
-      let sessionId: string | null = null;
-      
-      // Get session ID for domain enrichment (pricing)
-      if (jobType === "domain") {
-        sessionId = await pricing.ensureActiveSession();
-        if (!sessionId) {
-          throw new Error("Failed to create pricing session");
-        }
+      // Get session ID for both LinkedIn and domain enrichment (both have pricing now)
+      const sessionId = await pricing.ensureActiveSession();
+      if (!sessionId) {
+        throw new Error("Failed to create pricing session");
       }
 
       const requestBody: any = { 
         prospectIds: targetIds, 
         listId: activeListId, 
-        jobType 
+        jobType,
+        sessionId
       };
-      
-      if (sessionId) {
-        requestBody.sessionId = sessionId;
-      }
 
       const response = await fetch(`${API_BASE}/api/enqueue_enrichment`, {
         method: "POST",
@@ -430,9 +417,7 @@ export default function App() {
       refresh();
       
       // Refresh pricing session after successful enrichment
-      if (jobType === "domain") {
-        await pricing.getCurrentSession();
-      }
+      await pricing.getCurrentSession();
       
       alert(jobType === "domain" ? "Corporate enrichment started." : "LinkedIn enrichment queued.");
     } catch (err) {
@@ -1016,6 +1001,7 @@ export default function App() {
       <CostEstimatorPopup
         isOpen={costEstimatorOpen}
         prospectIds={targetIds}
+        enrichmentType={pendingEnrichmentType || "domain"}
         onCancel={handleCostEstimatorCancel}
         onEnrich={handleCostEstimatorEnrich}
         apiBase={API_BASE}

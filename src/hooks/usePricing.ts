@@ -14,10 +14,27 @@ export function usePricing(apiBase: string) {
   const ensureActiveSession = async (): Promise<string | null> => {
     try {
       setLoading(true);
+      
+      // First check if we already have an active session
+      if (currentSession && currentSession.status === 'active') {
+        return currentSession.session_id;
+      }
+      
+      // Try to get existing session from backend
+      const existingResponse = await fetch(`${apiBase}/api/pricing/sessions/current/global_user`);
+      if (existingResponse.ok) {
+        const data = await existingResponse.json();
+        if (data.session && data.session.status === 'active') {
+          setCurrentSession(data.session);
+          return data.session.session_id;
+        }
+      }
+      
+      // No active session found, create a new one
       const response = await fetch(`${apiBase}/api/pricing/sessions/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: 'global_user' })
+        body: JSON.stringify({ userId: 'global_user' })
       });
       
       if (!response.ok) throw new Error('Failed to start session');
@@ -39,8 +56,8 @@ export function usePricing(apiBase: string) {
       const response = await fetch(`${apiBase}/api/pricing/sessions/current/global_user`);
       
       if (response.ok) {
-        const session = await response.json();
-        setCurrentSession(session);
+        const data = await response.json();
+        setCurrentSession(data.session);
       } else {
         setCurrentSession(null);
       }
