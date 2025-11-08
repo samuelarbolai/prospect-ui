@@ -56,6 +56,7 @@ export default function App() {
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [listModalError, setListModalError] = useState<string | null>(null);
   const [autoListSelection, setAutoListSelection] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
   const tableSentinelRef = useRef<HTMLDivElement | null>(null);
 
   type ColumnDef = {
@@ -374,6 +375,15 @@ export default function App() {
       alert("Select at least one prospect inside the active list.");
       return;
     }
+
+    const jobTypeName = jobType === "domain" ? "Domain & Vertical" : "LinkedIn";
+    const confirmationMessage = `Are you sure you want to run ${jobTypeName} enrichment for ${targetIds.length} prospect(s)? This may incur costs.`;
+
+    if (!window.confirm(confirmationMessage)) {
+      return;
+    }
+
+    setIsEnriching(true);
     try {
       const response = await fetch(`${API_BASE}/api/enqueue_enrichment`, {
         method: "POST",
@@ -388,6 +398,8 @@ export default function App() {
     } catch (err) {
       console.error(err);
       alert("Unable to queue enrichment. Check console for details.");
+    } finally {
+      setIsEnriching(false);
     }
   };
 
@@ -718,14 +730,14 @@ export default function App() {
                 <div className="actions">
                   <button
                     className="primary"
-                    disabled={!canRunBulkActions}
+                    disabled={!canRunBulkActions || isEnriching}
                     onClick={handleRunLinkedIn}
                   >
                     Run LinkedIn
                   </button>
                   <button
                     className="primary ghost"
-                    disabled={!canRunBulkActions}
+                    disabled={!canRunBulkActions || isEnriching}
                     onClick={handleRunDomain}
                   >
                     Enrich domain & vertical
