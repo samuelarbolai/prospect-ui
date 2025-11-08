@@ -1,0 +1,32 @@
+{
+  "description": "Agent for pricing system implementation with autonomous permissions",
+  "allowedTools": [
+    "fs_read",
+    "fs_write", 
+    "execute_bash",
+    "todo_list"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": [
+        "./backend/**",
+        "./src/**",
+        "./**/*.js",
+        "./**/*.jsx",
+        "./**/*.json",
+        "./**/*.md"
+      ]
+    },
+    "execute_bash": {
+      "allowedCommands": [
+        "npm install.*",
+        "npm run.*",
+        "git status",
+        "git add.*",
+        "ls.*",
+        "mkdir.*"
+      ],
+      "autoAllowReadonly": true
+    }
+  }
+}

@@ -687,3 +687,330 @@ tbody tr:hover {
     flex: 1 1 45%;
   }
 }
+
+/* Pricing Components */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.cost-estimator-popup {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 2px solid #e5e7eb;
+}
+
+.cost-estimator-popup h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cost-details {
+  margin: 16px 0;
+}
+
+.org-count {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: #374151;
+}
+
+.cost-breakdown {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.breakdown-line {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.total-cost {
+  border-top: 1px solid #d1d5db;
+  padding-top: 8px;
+  margin-top: 8px;
+  font-size: 16px;
+  color: #1f2937;
+}
+
+.formula {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancel-btn, .enrich-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.2s;
+}
+
+.cancel-btn {
+  background: white;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.cancel-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.enrich-btn {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.enrich-btn:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.enrich-btn:disabled {
+  background: #9ca3af;
+  border-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.session-total-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f0f9ff;
+  border: 1px solid #0ea5e9;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.session-total-display.loading {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #6b7280;
+}
+
+.session-total-display.no-session {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.session-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-label {
+  color: #0c4a6e;
+  font-weight: 500;
+}
+
+.session-amount {
+  font-weight: 600;
+  color: #0c4a6e;
+  font-size: 16px;
+}
+
+.session-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.refresh-btn, .reset-btn, .start-session-btn {
+  padding: 4px 8px;
+  border: 1px solid;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.refresh-btn {
+  color: #0ea5e9;
+  border-color: #0ea5e9;
+}
+
+.refresh-btn:hover {
+  background: #0ea5e9;
+  color: white;
+}
+
+.reset-btn {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.reset-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+.start-session-btn {
+  color: #059669;
+  border-color: #059669;
+}
+
+.start-session-btn:hover {
+  background: #059669;
+  color: white;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+}
+
+.error {
+  text-align: center;
+  padding: 20px;
+  color: #dc2626;
+}
+
+.error button {
+  margin-top: 8px;
+  padding: 4px 12px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+/* Pricing Components */
+.session-total-display {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 1rem;
+  font-size: 0.9rem;
+}
+
+.session-info {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.session-label {
+  color: #666;
+}
+
+.session-amount {
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.session-id {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.cost-estimator-popup {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.cost-estimator-popup h3 {
+  margin: 0 0 1.5rem 0;
+  color: #1f2937;
+}
+
+.cost-details {
+  margin-bottom: 2rem;
+}
+
+.cost-details p {
+  margin: 0.5rem 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #f9fafb;
+}
+
+.btn-primary {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: #2563eb;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-primary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}

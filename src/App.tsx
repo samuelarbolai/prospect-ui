@@ -5,6 +5,9 @@ import { Prospect, ProspectFilters } from "./types";
 import { useProspects } from "./hooks/useProspects";
 import { useListOptions } from "./hooks/useListOptions";
 import { useLists } from "./hooks/useLists";
+import { usePricing } from "./hooks/usePricing";
+import { CostEstimatorPopup } from "./components/CostEstimatorPopup";
+import { SessionTotalDisplay } from "./components/SessionTotalDisplay";
 import { inject } from '@vercel/analytics';
  
 inject();
@@ -57,6 +60,8 @@ export default function App() {
   const [listModalError, setListModalError] = useState<string | null>(null);
   const [autoListSelection, setAutoListSelection] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
+  const [costEstimatorOpen, setCostEstimatorOpen] = useState(false);
+  const [pendingEnrichmentType, setPendingEnrichmentType] = useState<"linkedin" | "domain" | null>(null);
   const tableSentinelRef = useRef<HTMLDivElement | null>(null);
 
   type ColumnDef = {
@@ -215,6 +220,8 @@ export default function App() {
     createList,
     addProspectsToList,
   } = useLists();
+
+  const pricing = usePricing(API_BASE);
 
   const readyCount = useMemo(
     () => prospects.filter((row) => isOutreachReady(row)).length,
@@ -376,30 +383,76 @@ export default function App() {
       return;
     }
 
-    const jobTypeName = jobType === "domain" ? "Domain & Vertical" : "LinkedIn";
-    const confirmationMessage = `Are you sure you want to run ${jobTypeName} enrichment for ${targetIds.length} prospect(s)? This may incur costs.`;
-
-    if (!window.confirm(confirmationMessage)) {
+    // For domain enrichment, show cost estimator
+    if (jobType === "domain") {
+      setPendingEnrichmentType(jobType);
+      setCostEstimatorOpen(true);
       return;
     }
 
+    // For LinkedIn enrichment, proceed directly (no pricing)
+    await executeEnrichment(jobType);
+  };
+
+  const executeEnrichment = async (jobType: "linkedin" | "domain") => {
     setIsEnriching(true);
     try {
+      let sessionId: string | null = null;
+      
+      // Get session ID for domain enrichment (pricing)
+      if (jobType === "domain") {
+        sessionId = await pricing.ensureActiveSession();
+        if (!sessionId) {
+          throw new Error("Failed to create pricing session");
+        }
+      }
+
+      const requestBody: any = { 
+        prospectIds: targetIds, 
+        listId: activeListId, 
+        jobType 
+      };
+      
+      if (sessionId) {
+        requestBody.sessionId = sessionId;
+      }
+
       const response = await fetch(`${API_BASE}/api/enqueue_enrichment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prospectIds: targetIds, listId: activeListId, jobType }),
+        body: JSON.stringify(requestBody),
       });
+      
       if (!response.ok) throw new Error(await response.text());
+      
       setSelectedIds(new Set());
       setAutoListSelection(listViewActive);
       refresh();
+      
+      // Refresh pricing session after successful enrichment
+      if (jobType === "domain") {
+        await pricing.getCurrentSession();
+      }
+      
       alert(jobType === "domain" ? "Corporate enrichment started." : "LinkedIn enrichment queued.");
     } catch (err) {
       console.error(err);
       alert("Unable to queue enrichment. Check console for details.");
     } finally {
       setIsEnriching(false);
+      setCostEstimatorOpen(false);
+      setPendingEnrichmentType(null);
+    }
+  };
+
+  const handleCostEstimatorCancel = () => {
+    setCostEstimatorOpen(false);
+    setPendingEnrichmentType(null);
+  };
+
+  const handleCostEstimatorEnrich = () => {
+    if (pendingEnrichmentType) {
+      executeEnrichment(pendingEnrichmentType);
     }
   };
 
@@ -552,6 +605,12 @@ export default function App() {
           <h1>Aurora Leadflow</h1>
         </div>
         <div className="top-actions">
+          {pricing.currentSession && (
+            <SessionTotalDisplay 
+              currentTotal={pricing.currentSession.current_total}
+              sessionId={pricing.currentSession.session_id}
+            />
+          )}
           <span className="workspace-tag">LeadGen Workspace</span>
         </div>
       </header>
@@ -952,6 +1011,15 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Cost Estimator Popup */}
+      <CostEstimatorPopup
+        isOpen={costEstimatorOpen}
+        prospectIds={targetIds}
+        onCancel={handleCostEstimatorCancel}
+        onEnrich={handleCostEstimatorEnrich}
+        apiBase={API_BASE}
+      />
     </div>
   );
 }
