@@ -586,8 +586,8 @@ export default function App() {
     <div className="app-shell">
       <header className="top-bar">
         <div className="brand">
-          <div className="brand-mark">AL</div>
-          <h1>Aurora Leadflow</h1>
+          <div className="brand-mark">ar</div>
+          <h1>arbolito</h1>
         </div>
         <div className="top-actions">
           {pricing.currentSession && (

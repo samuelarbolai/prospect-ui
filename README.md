@@ -1,6 +1,6 @@
-# Prospect Pipeline UI
+# arbolito
 
-A lightweight React interface backed by the Express API in `../backend`. It lets you:
+arbolito is a lightweight React interface backed by the Express API in `../backend`. It lets you:
 
 - Filter prospects by list, priority, status, and fuzzy name search.
 - Scroll through paginated results (50 at a time, auto-load on scroll).

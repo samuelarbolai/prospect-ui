@@ -20,7 +20,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(155deg, #fef6f1 0%, #fff0e6 38%, #fde8f2 100%);
+  background: #ffffff;
   color: var(--text-primary);
 }
 
@@ -37,11 +37,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(80% 90% at 15% 15%, rgba(243, 188, 136, 0.45) 0%, rgba(255, 255, 255, 0) 65%),
-    radial-gradient(70% 80% at 85% 10%, rgba(246, 212, 140, 0.4) 0%, rgba(255, 255, 255, 0) 70%),
-    radial-gradient(75% 100% at 50% 100%, rgba(244, 167, 196, 0.32) 0%, rgba(255, 255, 255, 0) 65%),
-    linear-gradient(160deg, #fef6f1 0%, #fff1e8 50%, #fef0f6 100%);
+  background: #ffffff;
 }
 
 .top-bar {
